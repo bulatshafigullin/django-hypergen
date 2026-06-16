@@ -123,6 +123,58 @@ Hypergen is written by `Jeppe Tuxen <https://github.com/jeppetuxen>`_ and `Rune 
 
 We are using Hypergen extensively at work so it's a big focus of ours. 
 
+Websocket backends
+==================
+
+Hypergen ships with two interchangeable websocket backends. Consumer code, the
+JS client and the example apps are identical for both - you only switch a
+setting and the server command.
+
+Select the backend with the ``HYPERGEN_WS_BACKEND`` env var (read by both
+``settings.py`` and ``wsgi.py``):
+
+``channels`` (default)
+    Django Channels over ASGI, served by daphne. Requires
+    ``channels``, ``daphne`` and ``channels-redis``.
+
+    .. code-block:: bash
+
+        daphne --bind 0.0.0.0 -p 8000 asgi:application
+
+``gevent``
+    `gevent-websocket <https://www.github.com/jgelens/gevent-websocket>`_ served
+    by gunicorn over plain WSGI. Install ``requirements-gevent.txt`` (gevent,
+    gevent-websocket, gunicorn, redis; needs Python >= 3.8).
+
+    .. code-block:: bash
+
+        pip install -r requirements-gevent.txt
+        export HYPERGEN_WS_BACKEND=gevent
+        gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
+            -w 4 -b 0.0.0.0:8000 wsgi:application
+
+How the gevent backend works:
+
+- ``wsgi.py`` runs ``gevent.monkey.patch_all()`` before Django is imported.
+- Each connection is a greenlet; a second writer greenlet per connection
+  serializes outbound frames (sockets are not safe for concurrent writes).
+- ``ws/`` routes are ordinary Django urls - ``Consumer.as_asgi(...)`` returns a
+  Django view, so existing ``routing.py`` files keep working.
+- Groups and cross-worker fan-out (channels' "channel layer") are re-implemented
+  on a Redis pub/sub bridge. Set ``HYPERGEN_WS_REDIS_URL`` for multi-worker /
+  multi-host deployments; leave it unset for single-worker / in-process delivery
+  (like channels' ``InMemoryChannelLayer``).
+
+Notes:
+
+- ``manage.py runserver`` does **not** serve websockets under the gevent backend
+  (it is the plain WSGI dev server). Use gunicorn with the gevent worker, or use
+  the channels backend for ``runserver``-style development.
+- With more than one worker, the backend-push demo
+  (``websockets/send_message_from_backend``) needs ``HYPERGEN_WS_REDIS_URL`` set.
+- If fronting with nginx, proxy websockets with the ``Upgrade``/``Connection``
+  headers set.
+
 Why not Hypergen?
 =================
 

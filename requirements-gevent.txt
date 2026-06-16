@@ -1,0 +1,11 @@
+# Dependencies for the gevent-websocket backend (HYPERGEN_WS_BACKEND=gevent).
+# Install alongside the base/dev requirements:  pip install -r requirements-gevent.txt
+# Requires Python >= 3.8.
+gevent>=23.9.1
+gevent-websocket>=0.10.1
+gunicorn>=21.2.0
+redis>=5.0.0
+# psycogreen>=1.0.0  # uncomment if running Postgres under gevent
+
+# Optional, for the Selenium browser test (examples/test_websocket_selenium.py):
+# selenium>=4.40.0

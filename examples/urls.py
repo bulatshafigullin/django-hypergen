@@ -48,3 +48,18 @@ urlpatterns = [
     url('^booking/', include(booking.urls, namespace="booking")),
     url('^websockets/', include(websockets.urls, namespace="websockets")),
     url('^features/', include(features.urls, namespace="features")),]
+
+# With the gevent backend, websockets are served by the normal WSGI app, so the
+# ws/ routes (Consumer.as_asgi() returns a Django view) live in urlpatterns.
+# With channels they are routed by asgi.py instead and must NOT be added here.
+from django.conf import settings as _settings
+
+if getattr(_settings, "HYPERGEN_WS_BACKEND", "channels") == "gevent":
+    import routing
+    urlpatterns += routing.websocket_urlpatterns
+
+# In DEBUG, serve static files through the WSGI app too. runserver does this
+# automatically, but gunicorn (used for the gevent backend) does not.
+if _settings.DEBUG:
+    from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+    urlpatterns += staticfiles_urlpatterns()

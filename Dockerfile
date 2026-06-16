@@ -8,5 +8,9 @@ RUN pip install -r requirements-prod.txt
 RUN make cython-compile
 EXPOSE 8000
 WORKDIR /code/examples/
-# CMD gunicorn wsgi --bind 0.0.0.0:8000 --error-logfile - --log-level warn --workers 4 --max-requests 100000 --max-requests-jitter 1000
-CMD daphne --bind 0.0.0.0 -p 8000 --access-log - --verbosity 1 asgi:application
+# channels/ASGI (daphne):
+# CMD daphne --bind 0.0.0.0 -p 8000 --access-log - --verbosity 1 asgi:application
+# gevent-websocket (gunicorn): set HYPERGEN_WS_BACKEND=gevent so wsgi.py monkey-patches.
+ENV HYPERGEN_WS_BACKEND=gevent
+CMD gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
+    -w 4 -b 0.0.0.0:8000 --access-logfile - --log-level warning wsgi:application

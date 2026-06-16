@@ -7,9 +7,13 @@ yattag<=1.15.1
 beautifulsoup4<=4.9.3
 pyperclip<=1.8.1
 Django<=4.2.6
+# channels/ASGI backend (HYPERGEN_WS_BACKEND=channels):
 channels<=4.0.0
 daphne<=4.0.0
 channels-redis<=4.1.0
+# gevent-websocket backend (HYPERGEN_WS_BACKEND=gevent) lives in
+# requirements-gevent.txt - kept separate so it doesn't constrain the old
+# Python versions in CI.
 Cython==3.0a6
 contextlib2==0.6.0.post1
 cymem==2.0.8

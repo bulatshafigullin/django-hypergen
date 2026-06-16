@@ -31,9 +31,18 @@ else:
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
+# Websocket backend: "channels" (django-channels/ASGI/daphne) or
+# "gevent" (gevent-websocket/gunicorn). Kept in sync with wsgi.py via the env var.
+HYPERGEN_WS_BACKEND = os.environ.get("HYPERGEN_WS_BACKEND", "channels")
+
 # Disable channels if not supported
-ENABLE_CHANNELS = sys.version_info >= (3, 7) and django.VERSION >= (3, 2)
-HYPERGEN_INTERNAL_ONLY_ENFORCE_ASSERT_CHANNELS = ENABLE_CHANNELS  # Might go away at any time, don't use!
+ENABLE_CHANNELS = (HYPERGEN_WS_BACKEND == "channels" and sys.version_info >= (3, 7)
+    and django.VERSION >= (3, 2))
+HYPERGEN_INTERNAL_ONLY_ENFORCE_ASSERT_CHANNELS = ENABLE_CHANNELS or HYPERGEN_WS_BACKEND == "gevent"
+
+# Cross-worker websocket bus for the gevent backend (set further down, once
+# REDIS_URL is known). Leave unset for a single worker / development (in-process
+# only, like channels' InMemoryChannelLayer).
 
 # Application definition
 
@@ -124,10 +133,16 @@ if os.environ.get("PROD", False):
         'console': {'level': 'INFO', 'class': 'logging.StreamHandler', 'stream': sys.stdout,
         'formatter': 'verbose'}}, 'loggers': {'': {'handlers': ['console'], 'level': 'INFO', 'propagate': True}}}
 
-# Channels
+# Websocket bus
 
-ASGI_APPLICATION = "asgi.application"
-CHANNEL_LAYERS = {
-    'default': {
-    'BACKEND': 'channels_redis.core.RedisChannelLayer',
-    'CONFIG': {"hosts": [(REDIS_URL, 6379)],},},}
+if HYPERGEN_WS_BACKEND == "gevent":
+    # Needed for multi-worker group fan-out (e.g. the backend-push demo). With a
+    # single worker this can be left unset for purely in-process delivery.
+    HYPERGEN_WS_REDIS_URL = os.environ.get("HYPERGEN_WS_REDIS_URL", "redis://%s:6379/0" % REDIS_URL)
+else:
+    # Channels
+    ASGI_APPLICATION = "asgi.application"
+    CHANNEL_LAYERS = {
+        'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {"hosts": [(REDIS_URL, 6379)],},},}

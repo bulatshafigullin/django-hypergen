@@ -19,6 +19,9 @@ services:
       - redis
     environment:
       PROD: "true"
+      # Websocket backend: "gevent" (gunicorn+gevent-websocket) or "channels" (daphne).
+      # Cross-worker group fan-out uses the linked redis service automatically.
+      HYPERGEN_WS_BACKEND: "gevent"
     ports:
       - "9876:8000"  # Expose Django on port 9876
 

@@ -27,6 +27,13 @@ docker-system-prune:
 	docker system prune -a
 pytest-run:
 	pytest --tb=native -x -vvvv src/hypergen/test_all.py
+gevent-server:
+	cd examples && PYTHONPATH="$$(pwd):$$(pwd)/../src" HYPERGEN_WS_BACKEND=gevent HYPERGEN_WS_REDIS_URL="" \
+		DJANGO_SETTINGS_MODULE=test_browser_settings \
+		gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 -b 127.0.0.1:8002 wsgi:application
+selenium-run:
+	# Start the gevent server (make gevent-server) in another shell first.
+	cd examples && python test_websocket_selenium.py
 testcafe-run:
 	cd examples && testcafe chrome test_all.js -q attemptLimit=5,successThreshold=1 |& ansi2txt
 testcafe-run-headless:
