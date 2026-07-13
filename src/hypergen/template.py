@@ -143,11 +143,17 @@ def hypergen_to_response(func, *args, **kwargs):
 def join_html(html):
     def fmt(html):
         for item in html:
-            if issubclass(type(item), base_element):
+            # Plain str is the overwhelming majority of items here (raw tag
+            # markup, escaped attribute values/text) — check it first so we
+            # skip the issubclass()/callable() checks for the common case.
+            item_type = type(item)
+            if item_type is str:
+                yield item
+            elif issubclass(item_type, base_element):
                 yield item.as_string()
             elif callable(item):
                 yield item()
-            elif type(item) is GeneratorType:
+            elif item_type is GeneratorType:
                 with c(at="hypergen", into=[]):
                     yield join_html(item)
             else:
@@ -215,6 +221,10 @@ class base_element(ContextDecorator):
         # into) — fetch it once into a local instead of re-walking the
         # persistent map each time; `hg` doesn't change mid-call because
         # nothing in this method opens/closes a `with context(...)` scope.
+        # A successful `c.hypergen` fetch above already proves "hypergen" is
+        # in the context (Context.__getattr__ only raises AttributeError on
+        # a missing key) — the separate "hypergen" in c assert below it was
+        # provably always true, so it's dropped rather than re-checked.
         hg = c.hypergen
         with ExitStack() as stack:
             children = list(children)  # Allow plugins to alter child nodes.
@@ -222,8 +232,6 @@ class base_element(ContextDecorator):
                 stack.enter_context(plugin.wrap_element_init(self, children, attrs)) for plugin in hg.plugins
                 if hasattr(plugin, "wrap_element_init")]
             children = tuple(children)  # Immutable again.
-
-            assert "hypergen" in c, "Element called outside hypergen context."
 
             self.t = attrs.pop("t", t)
             self.children = children

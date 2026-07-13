@@ -33,7 +33,13 @@ except ImportError:
 ### Helpers internal to hypergen, DONT use these! ###
 
 def make_string(s):
-    if s is None:
+    # Fast path: skip the force_str() call entirely for the overwhelmingly
+    # common case (plain str fragments/attribute values already produced by
+    # base_element/t()) instead of paying a cross-module call just to have
+    # force_str() re-discover `issubclass(type(s), str)` itself.
+    if type(s) is str:
+        return s
+    elif s is None:
         return ""
     else:
         return force_str(s)
