@@ -210,10 +210,16 @@ class base_element(ContextDecorator):
         return instance
 
     def __init__(self, *children, **attrs):
+        # `c.hypergen` resolves through the pyrsistent context on every
+        # attribute access. It's read several times below (plugins, ids,
+        # into) — fetch it once into a local instead of re-walking the
+        # persistent map each time; `hg` doesn't change mid-call because
+        # nothing in this method opens/closes a `with context(...)` scope.
+        hg = c.hypergen
         with ExitStack() as stack:
             children = list(children)  # Allow plugins to alter child nodes.
             [
-                stack.enter_context(plugin.wrap_element_init(self, children, attrs)) for plugin in c.hypergen.plugins
+                stack.enter_context(plugin.wrap_element_init(self, children, attrs)) for plugin in hg.plugins
                 if hasattr(plugin, "wrap_element_init")]
             children = tuple(children)  # Immutable again.
 
@@ -233,14 +239,16 @@ class base_element(ContextDecorator):
 
             # Make sure ids are unique
             if id_ is not None:
-                assert id_ not in c.hypergen["ids"], "Duplicate id: {}".format(id_)
-                c.hypergen["ids"].add(id_)
+                ids = hg["ids"]
+                assert id_ not in ids, "Duplicate id: {}".format(id_)
+                ids.add(id_)
 
             # Render and save position in into.
-            self.i = len(c.hypergen.into)
-            c.hypergen.into.extend(self.start())
-            c.hypergen.into.extend(self.end())
-            self.j = len(c.hypergen.into)
+            into = hg.into
+            self.i = len(into)
+            into.extend(self.start())
+            into.extend(self.end())
+            self.j = len(into)
 
             super(base_element, self).__init__()
 
@@ -292,8 +300,9 @@ class base_element(ContextDecorator):
         return s
 
     def delete(self):
+        into = c.hypergen.into
         for i in range(self.i, self.j):
-            c.hypergen.into[i] = DELETED
+            into[i] = DELETED
 
     def format_children(self, children, nested=False):
         into = []
@@ -384,8 +393,9 @@ class Component(object):
         self.j = j
 
     def delete(self):
+        into = c.hypergen.into
         for i in range(self.i, self.j):
-            c.hypergen.into[i] = DELETED
+            into[i] = DELETED
 
 def component(f):
     @wraps(f)

@@ -99,6 +99,15 @@ class contextlist(UserList):
     def __init__(self, context_key, *args, **kwargs):
         self.context_key = context_key
         self.contexts = defaultdict(list)
+        # `.data` is read on every single list op (append/extend/len/...),
+        # and used to require re-deriving the active target_id from the
+        # pyrsistent context on each call. Cache it, keyed by the identity
+        # of the current context snapshot (`context.ctx`) — that identity
+        # only changes when a `with context(...)` scope actually pushes or
+        # pops (e.g. a target_id switch), so within a scope this turns an
+        # O(pmap traversal) lookup into an O(1) identity check.
+        self._cache_ctx_token = None
+        self._cache_list = None
         super(contextlist, self).__init__(*args, **kwargs)
 
     def _get_context_value(self):
@@ -109,8 +118,14 @@ class contextlist(UserList):
 
     @property
     def data(self):
-        return self.contexts[self._get_context_value()]
+        token = context.ctx
+        if token is not self._cache_ctx_token:
+            self._cache_ctx_token = token
+            self._cache_list = self.contexts[self._get_context_value()]
+        return self._cache_list
 
     @data.setter
     def data(self, value):
         self.contexts[self._get_context_value()] = value
+        self._cache_ctx_token = context.ctx
+        self._cache_list = value
