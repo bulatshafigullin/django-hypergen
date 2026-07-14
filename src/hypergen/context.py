@@ -129,3 +129,12 @@ class contextlist(UserList):
         self.contexts[self._get_context_value()] = value
         self._cache_ctx_token = context.ctx
         self._cache_list = value
+
+    def __iter__(self):
+        # UserList doesn't define its own __iter__, so it falls back to the
+        # generic collections.abc Sequence mixin: iterate by index, calling
+        # self[i] (i.e. __getitem__, which re-enters the `.data` property)
+        # repeatedly until IndexError. That's an extra property access and
+        # dispatch per item just to walk a plain list — return the
+        # underlying list's own fast iterator instead.
+        return iter(self.data)
